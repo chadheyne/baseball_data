@@ -73,13 +73,12 @@ def download_stats(team, name):
 	for table in stats.find_all('table'):
 		for row in table.find_all('tr'):
 			col = row.get_text().split('\n')
-			csvf.write('| '.join(col))
+			csvf.write(', '.join(col))
 			csvf.write('\n')
-	
+	time.sleep(42)
 	csvf.close()
 
 
-#Opponent table
 def download_schedules(team, name):
 	
 	if not team['schedules'].endswith('shtml'):
@@ -95,10 +94,10 @@ def download_schedules(team, name):
 	datafile = os.path.join(directory,name+date+".csv")
 
 	if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
-		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['schedules']))
+		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['allergy']))
 		return
-	
-	csvf = open(datafile, "w", encoding='utf-8', newline = '')
+	infile = open(datafile, "w", encoding='utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
 
 	schedules = BeautifulSoup(urllib.request.urlopen(team['schedules']))
 
@@ -108,39 +107,40 @@ def download_schedules(team, name):
 		if 'cellspacing' in table.attrs:
 			if not table.find('td').get_text() == 'Season Summary':
 			
-				header = list(set([head.get_text() for head in table.find_all('th')]))
+				header = [head.get_text() for head in table.find_all('th')]
+				headers = []
+				[headers.append(item) for item in header if item not in headers]
 				data = [entry.get_text().strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' not in entry.attrs]
 				sets = [entry.get_text().strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' in entry.attrs]
-				tuples = list(zip(header*(len(data)//6), data))
-			
-				for tup in tuples:
-					csvf.write(', '.join(tup))
-					csvf.write('\n')
-			
-			elif table.find('td').get_text() == 'Season Summary':
-			
-				for row in table.find_all('tr'):
-					data = [entry.text.strip().replace(',', '') for entry in row.find_all('td')]
-					csvf.write(', '.join(data))
-					csvf.write('\n')
+				
+				#Figure out why this isn't printing per row
+				for i, split in enumerate(sets):
+					csvf.writerow(split)
+					csvf.writerow(headers)
+					csvf.writerow(data[i:i+6])
+					
 
-			else:
-				print("Unable to process Table: {0} with attributes {1}".format(table.name, table.attrs))
+		#   update this so it prints to csv
+		# 	elif table.find('td').get_text() == 'Season Summary':
+			
+		# 		for row in table.find_all('tr'):
+		# 			data = [entry.text.strip().replace(',', '') for entry in row.find_all('td')]
+		# 			csvf.write(', '.join(data))
+		# 			csvf.write('\n')
 
-		elif table.attrs['id'] == 'team_schedule':
-			for row in table.find_all('tr'):
-				data = row.text.split('\n')
-				csvf.write('| '.join(data))
-				csvf.write('\n')
+		# 	else:
+		# 		print("Unable to process Table: {0} with attributes {1}".format(table.name, table.attrs))
 
+		# elif table.attrs['id'] == 'team_schedule':
+		# 	for row in table.find_all('tr'):
+		# 		data = row.text.split('\n')
+		# 		csvf.write(', '.join(data))
+		# 		csvf.write('\n')
+	time.sleep(42)
 	csvf.close()
 
 
-#Fix
 def download_broadcast(team, name):
-	
-	if not team['broadcast'].endswith(name.lower()):
-		return
 	
 	date = time.strftime("_%m_%d_%Y")	
 	
@@ -155,27 +155,38 @@ def download_broadcast(team, name):
 		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['broadcast']))
 		return
 	
-	csvf = open(datafile, "w", encoding='utf-8', newline = '')
+	infile = open(datafile, "w", encoding='utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
 
 	broadcast = BeautifulSoup(urllib.request.urlopen(team['broadcast']))
 
 	for table in broadcast.find_all('table'):
-		header = table.find_all('th')
-		headers = [th.text for th in header]
-		rows = table.find_all('tr')
-		csvf.write('| '.join(headers))
-		csvf.write('\n')
-		for tr in rows[1:]:
-			col = tr.get_text().split('\n')
-			csvf.write('| '.join(col))
-			csvf.write('\n')
-	csvf.close()
 
-def download_allergy(team, name):
+		rows = table.find('tr')
+		headers = [th.text for th in rows if not th == '\n']
+	
+		csvf.writerow(headers)
+		print(headers, name)
+		for tr in rows.find_next_siblings():
+			dateGame = tr.find('td')
+			
+			col = [c.text for c in dateGame.find_next_siblings()]
+			col.insert(0, dateGame.text)
+			radio = col.pop()
+			col.extend(radio.split(', '))
+			csvf.writerow(col)
+
+	infile.close()
+	return True
+
+def download_allergy(team, name, codes):
+
 	if not team['allergy'].endswith('Enter'):
 		return
+	
 	date = time.strftime("_%m_%d_%Y")
-	print(team['allergy'])
+	
+	#print(team['allergy'])
 
 	directory = os.path.join('Data', 'Allergy', date)
 	
@@ -183,25 +194,33 @@ def download_allergy(team, name):
 		os.makedirs(directory)
 
 	datafile = os.path.join(directory,name+date+".csv")
-	
-	csvf = open(datafile, "w", encoding='utf-8', newline = '')
+
+	if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
+		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['allergy']))
+		return
+	infile = open(datafile, "w", encoding='utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
 
 	allergy = BeautifulSoup(urllib.request.urlopen(team['allergy']))
-	today = allergy.find('img', alt="Today's Pollen Level")
-	findUp = today.find_parent().find_parent().find_all('td')
-	(today, tomorrow, nextDay, twoNext) = findUp
-	
+
+	data = allergy.find_all('td', class_="forecast-small-text")
+
+	title1 = allergy.title.text.find('for ')
+	title2 = allergy.title.text.find('| ')
+	city = allergy.title.text[title1+3:title2].strip()
+
 	#Get the days off of the img. Possible to find out what day tomorrow/today are based on day(next)-1?
-	dayToday = today.find('img')['alt'].split(' ')[0]
-	dayTom = tomorrow.find('img')['alt'].split(' ')[0]
-	dayNext = nextDay.find('img')['alt'].split(' ')[0]
-	dayTwonext = twoNext.find('img')['alt'].split(' ')[0]
+	days = [day.text for day in data if not day.find('img')]
+	imgs = [day.find('img')['src'].split('v=')[1] for day in data if day.find('img')]
+	
+	nums = [str(int(codes[i]['idx'])/10) for i in imgs if codes[i]['idx']]
+	
+	results = list(zip(days,nums))
+	csvf.writerow(['City/Zip', 'Date'])
+	csvf.writerow([city, date[1:]])
+	csvf.writerows(results)
 
-	srcToday = today.find('img')['src']
-	srcTom = tomorrow.find('img')['src']
-	srcNext = nextDay.find('img')['src']
-	srcTwonext = twoNext.find('img')['src']
-
+#Update this so it prints to csv
 def download_promo(team, name):
 	
 	if not team['promo']:
@@ -245,7 +264,6 @@ def download_promo(team, name):
 			
 			csvf.write(', '.join(hits))
 			csvf.write('\n')
-	time.sleep(42)
 	csvf.close()
 	return
 
@@ -269,48 +287,82 @@ def get_promos(teams):
 
 	return teams
 
+def get_allergycodes():
+
+	allergy = defaultdict(dict)
+
+	allergydata = csv.DictReader(open("Data/allergycodes.csv"))
+
+	for row in allergydata:
+		allergy[row['hexdigit']] = {key.lower(): value.strip() for key, value in row.items()}
+
+	return allergy
+
+def iterate_stats(teams):
+
+	for team in sorted(teams.keys()):
+		print('Downloading stats     for {0}: \t link: {1}'.format(team, teams[team]['stats']))
+
+		download_stats(teams[team], team)
+
+	return True
+
+def iterate_schedules(teams):
+	
+	for team in sorted(teams.keys()):
+		print('Downloading schedules     for {0}: \t link: {1}'.format(team, teams[team]['schedules']))
+
+		download_schedules(teams[team], team)
+
+	return True
+
+#Some broadcasts don't download
+#TBR, WSN, BAL, MIL
+def iterate_broadcast(teams):
+
+	for team in sorted(teams.keys()):
+		print('Downloading broadcast     for {0}: \t link: {1}'.format(team, teams[team]['broadcast']))
+
+		download_broadcast(teams[team], team)
+
+	return True	
+
+def iterate_promo(teams):
+
+	teams = get_promos(teams)
+	for team in sorted(teams.keys()):
+		print('Downloading promo     for {0}: \t link: {1}'.format(team, teams[team]['promo']))
+
+		download_promo(teams[team], team)
+
+	return True
+
+def iterate_allergy(teams):
+	allergycodes = get_allergycodes()
+	for team in sorted(teams.keys()):
+		print('Downloading pollen     for {0}: \t link: {1}'.format(team, teams[team]['allergy']))
+
+		download_allergy(teams[team], team, iterate_allergy)
+
+	return True
+
+def main():
+	teams = defaultdict(dict)
+	teamdata = csv.DictReader(open("Data/MLB 2013 Req Daily Info - Websites.csv"))
+	for rows in teamdata:
+		teams[rows['TEAM']] = {key.lower(): value.strip() for key, value in rows.items() if not key == 'TEAM'}
+	
+	overall = teams.pop('ALL')
+
+	#iterate_stats(teams)
+	#iterate_schedules(teams)
+	#iterate_promo(teams)
+	#iterate_broadcast(teams)
+	#iterate_allergy(teams)	
 
 
 if __name__ == "__main__":
-	teams = defaultdict(dict)
-	reader = csv.DictReader(open("Data/MLB 2013 Req Daily Info - Websites.csv"))
-	for rows in reader:
-		teams[rows['TEAM']] = {key.lower(): value.strip() for key, value in rows.items() if not key == 'TEAM'}
-	
-	#teams = get_promos(teams)
-	
-	for team in sorted(teams.keys()):
-		if  team == 'ALL':
-			continue
-		#download_stats(links[team], team)
-		#print('Downloading stats     for {0}: \t link: {1}'.format(team, teams[team]['stats']))
-		#time.sleep(42)
-		download_schedules(teams[team], team)
-		print('Downloading schedules for {0}: \t link: {1}'.format(team, teams[team]['schedules']))
-		
-		#download_broadcast(teams[team], team)
-		#print('Downloading broadcast for {0}: \t link: {1}'.format(team, teams[team]['broadcast']))
-		#download_promo(teams[team], team)
-		#print('Downloading promo     for {0}: \t link: {1}'.format(team, teams[team]['promo']))
-		
-
-# A6d = 12?			# 5Fm = 9
-# A6c = 11			# 
-# A6b = 10			# 60h = 7
-# AE = 9			# 60g = 6
-# AD = 8			# 60f = 5
-# AC = 7			# 60e = 4
-# AB = 6			# 5Fg = 3
-# AA = 5			# 60c = 2 	
-# A9 = 4			# 60b = 1
-# A8 = 3			# 5Fd = 0 
-# A7 = 2			#
-# A6 = 1			#
-# A5 = 0			#
+	main()
 
 
-# team = {}
-# 		name = rows[0]
-# 		team['broadcast'], team['promo'], team['stats'], team['schedules'], team['allergy'], team['standings'], team['wildcardStandings'] = rows[1:]
-# 		teams[name] = team
-# 	
+
