@@ -418,10 +418,10 @@ def make_email(teams, overall, downloadedFiles):
 def main():
 	teams, overall, downloadedFiles = load_teams()
 	iterate_stats(teams, downloadedFiles)
-	#iterate_schedules(teams, downloadedFiles)
-	#iterate_promo(teams, downloadedFiles)
-	#iterate_broadcast(teams, downloadedFiles)
-	#iterate_allergy(teams, downloadedFiles)
+	iterate_schedules(teams, downloadedFiles)
+	iterate_promo(teams, downloadedFiles)
+	iterate_broadcast(teams, downloadedFiles)
+	iterate_allergy(teams, downloadedFiles)
 	return teams
 
 if __name__ == "__main__":
