@@ -110,34 +110,39 @@ def download_schedules(team, name):
 				header = [head.get_text() for head in table.find_all('th')]
 				headers = []
 				[headers.append(item) for item in header if item not in headers]
-				data = [entry.get_text().strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' not in entry.attrs]
-				sets = [entry.get_text().strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' in entry.attrs]
+				data = [entry.text.strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' not in entry.attrs]
+				sets = [entry.text.strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' in entry.attrs]
 				
-				#Figure out why this isn't printing per row
+
 				for i, split in enumerate(sets):
-					csvf.writerow(split)
+					csvf.writerow(['','',split]) #Get some extra padding at the front
 					csvf.writerow(headers)
-					csvf.writerow(data[i:i+6])
+					csvf.writerow(data[i*6:i*6+6]) #There has to be a better way to zip this together. 
 					
 
 		#   update this so it prints to csv
-		# 	elif table.find('td').get_text() == 'Season Summary':
+			elif table.find('td').get_text() == 'Season Summary':
 			
-		# 		for row in table.find_all('tr'):
-		# 			data = [entry.text.strip().replace(',', '') for entry in row.find_all('td')]
-		# 			csvf.write(', '.join(data))
-		# 			csvf.write('\n')
+		 		for row in table.find_all('tr'):
+		 			data = [entry.text.strip().replace(',', '') for entry in row.find_all('td')]
+		 			csvf.writerow(data)
+		 			
+			else:
+		 		print("Unable to process Table: {0} with attributes {1}".format(table.name, table.attrs))
 
-		# 	else:
-		# 		print("Unable to process Table: {0} with attributes {1}".format(table.name, table.attrs))
+		elif 'id' in table.attrs and table.attrs['id'] == 'team_schedule':
+			headers = [item.text for item in table.find('tr').find_all('th')]
+			csvf.writerow(headers)
+			for row in table.find_all('tr'):
+				data = [td.text for td in row.find_all('td') if not row.find('th')]
+				csvf.writerow(data)
 
-		# elif table.attrs['id'] == 'team_schedule':
-		# 	for row in table.find_all('tr'):
-		# 		data = row.text.split('\n')
-		# 		csvf.write(', '.join(data))
-		# 		csvf.write('\n')
+		else:
+			print("Unable to process Table: {0} with attributes {1}".format(table.name, table.attrs))
+	
+	infile.close()
 	time.sleep(42)
-	csvf.close()
+	return schedules
 
 
 def download_broadcast(team, name):
@@ -177,7 +182,7 @@ def download_broadcast(team, name):
 			csvf.writerow(col)
 
 	infile.close()
-	return True
+	return broadcast
 
 def download_allergy(team, name, codes):
 
@@ -346,20 +351,23 @@ def iterate_allergy(teams):
 
 	return True
 
-def main():
+def load_teams():
 	teams = defaultdict(dict)
 	teamdata = csv.DictReader(open("Data/MLB 2013 Req Daily Info - Websites.csv"))
 	for rows in teamdata:
-		teams[rows['TEAM']] = {key.lower(): value.strip() for key, value in rows.items() if not key == 'TEAM'}
-	
+		teams[rows['TEAM']] = {key.lower(): value.strip() for key, value in rows.items() if not key == 'TEAM'} 
 	overall = teams.pop('ALL')
 
+	return teams, overall
+
+def main():
+	teams, overall = load_teams()
 	#iterate_stats(teams)
 	#iterate_schedules(teams)
 	#iterate_promo(teams)
 	#iterate_broadcast(teams)
 	#iterate_allergy(teams)	
-
+	return teams
 
 if __name__ == "__main__":
 	main()
