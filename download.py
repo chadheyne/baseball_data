@@ -580,6 +580,8 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 		iterate_overall(overall, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		
+		make_list(teams, overall, downloadedFiles)
+		
 		if subcommand is True:
 			send_update(True)
 		
@@ -599,6 +601,20 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 		else:
 			print('No emails')	
 
+def ocr_images(urls, downloadedFiles):
+	from tesserwrap import Tesseract
+	from PIL import Image
+	import io
+
+	for url in urls:
+
+		pic = io.BytesIO(urllib.request.urlopen(url).read())
+
+		img = Image.open(pic)
+		tr = Tesseract()
+		text = tr.ocr_image(img)
+		print(text.split('\n')[0])
+
 		
 
 def send_update(wantZip = True):
@@ -614,6 +630,7 @@ def send_update(wantZip = True):
 
 def main():
 	
+	start = time.time()
 	teams, overall, downloadedFiles = load_teams()
 	
 	iterate_stats(teams, downloadedFiles)
@@ -628,6 +645,11 @@ def main():
 	
 	iterate_overall(overall, downloadedFiles)
 	
+	make_list(teams, overall, downloadedFiles)
+	
+	minutes, seconds = divmod(time.time() - start, 60)
+	print("Finished downloading all of the data: {0} minutes and {1} seconds".format(minutes, seconds))
+
 	return teams
 
 if __name__ == "__main__":
