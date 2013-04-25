@@ -56,7 +56,7 @@ def download_stats(team, name):
 	
 	date = time.strftime("_%m_%d_%Y")	
 
-	directory = os.path.join('Data', 'Stats', date)
+	directory = os.path.join('Data', date, 'Stats')
 	if not os.path.exists(directory):
 		os.makedirs(directory)
 	
@@ -100,7 +100,7 @@ def download_schedules(team, name):
 	
 	date = time.strftime("_%m_%d_%Y")	
 
-	directory = os.path.join('Data', 'Schedules', date)
+	directory = os.path.join('Data', date, 'Schedules')
 	
 	if not os.path.exists(directory):
 		os.makedirs(directory)
@@ -162,7 +162,7 @@ def download_broadcast(team, name):
 	
 	date = time.strftime("_%m_%d_%Y")	
 	
-	directory = os.path.join('Data', 'Broadcast', date)
+	directory = os.path.join('Data', date, 'Broadcast')
 	
 	if not os.path.exists(directory):
 		os.makedirs(directory)
@@ -184,7 +184,7 @@ def download_broadcast(team, name):
 		headers = [th.text for th in rows if not th == '\n']
 	
 		csvf.writerow(headers)
-		print(headers, name)
+
 		for tr in rows.find_next_siblings():
 			dateGame = tr.find('td')
 			
@@ -204,7 +204,7 @@ def download_allergy(team, name, codes):
 	
 	date = time.strftime("_%m_%d_%Y")
 	
-	directory = os.path.join('Data', 'Allergy', date)
+	directory = os.path.join('Data', date, 'Allergy')
 	
 	if not os.path.exists(directory):
 		os.makedirs(directory)
@@ -230,10 +230,14 @@ def download_allergy(team, name, codes):
 	days = [day.text for day in data if not day.find('img')]
 	imgs = [day.find('img')['src'].split('v=')[1] for day in data if day.find('img')]
 	urls = ['www.pollen.com/' + day.find('img')['src'] for day in data if day.find('img')]
-	#nums = [str(int(codes[i]['idx'])/10) for i in imgs if codes[i]['idx']]
-	
-	results = list(zip(days,imgs, urls))
-	csvf.writerow(['City/Zip', 'Date'])
+
+	if codes:
+		nums = [codes[i] for i in urls]
+		results = list(zip(days, imgs, urls, nums))
+		csvf.writerow(['City/Zip', 'Date', 'URL', 'Value'])
+	else:
+		results = list(zip(days, imgs, urls))
+		csvf.writerow(['City/Zip', 'Date', 'URL', 'Value'])
 	csvf.writerow([city, date[1:]])
 	csvf.writerows(results)
 	return {'html': allergy, 'datafile': datafile, 'url': urls}
@@ -244,7 +248,7 @@ def download_promo(team, name):
 		return
 	date = time.strftime("_%m_%d_%Y")	
 	
-	directory = os.path.join('Data', 'Promo', date)
+	directory = os.path.join('Data', date, 'Promo')
 	if not os.path.exists(directory):
 		os.makedirs(directory)
 
@@ -285,6 +289,68 @@ def download_promo(team, name):
 	infile.close()
 	return {'html': promo, 'datafile': datafile}
 
+def download_standings(team, name='Full_Standings'):
+	if not team['standings']:
+		return 
+
+	date = time.strftime("_%m_%d_%Y")	
+	
+	directory = os.path.join('Data', date, 'Standings')
+	if not os.path.exists(directory):
+		os.makedirs(directory)
+
+	datafile = os.path.join(directory,name+date+".csv")
+
+	if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
+		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['standings']))
+		return {'html': True, 'datafile': datafile}
+
+	infile = open(datafile, "w", encoding='utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
+
+	standings = BeautifulSoup(urllib.request.urlopen(team['standings']))
+
+	for table in standings.find_all('table'):
+		
+		for row in table.find_all('tr'):
+			cols = [col.text for col in row.find_all('td')]			
+			csvf.writerow(cols)
+			
+	infile.close()
+
+	return {'html': standings, 'datafile': datafile}
+
+def download_wildcard(team, name='Wildcard'):
+	if not team['wildcard standings']:
+		return 
+
+	date = time.strftime("_%m_%d_%Y")	
+	
+	directory = os.path.join('Data', date, 'Standings')
+	if not os.path.exists(directory):
+		os.makedirs(directory)
+
+	datafile = os.path.join(directory,name+date+".csv")
+
+	if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
+		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['wildcard standings']))
+		return {'html': True, 'datafile': datafile}
+
+	infile = open(datafile, "w", encoding='utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
+
+	wildcard = BeautifulSoup(urllib.request.urlopen(team['wildcard standings']))
+
+	for table in wildcard.find_all('table'):
+		
+		for row in table.find_all('tr'):
+			cols = [col.text for col in row.find_all('td')]			
+			csvf.writerow(cols)
+			
+	infile.close()
+
+	return {'html': wildcard, 'datafile': datafile}	
+
 def get_promos(teams):
 
 	urls = deque([teams[team]['promo'] for team in teams.keys() if teams[team]['promo'] ])
@@ -305,14 +371,13 @@ def get_promos(teams):
 
 	return teams
 
-def get_allergycodes():
+def get_allergycodes(date):
 
 	allergy = defaultdict(dict)
 
-	allergydata = csv.DictReader(open("Data/allergycodes.csv"))
-
+	allergydata = csv.DictReader(open("Data/"+date+"allergycodes"+date+".csv"))
 	for row in allergydata:
-		allergy[row['hexdigit']] = {key.lower(): value.strip() for key, value in row.items()}
+		allergy[row['URL']] = row['value']
 
 	return allergy
 
@@ -346,8 +411,6 @@ def iterate_schedules(teams, downloadedFiles):
 
 	return True
 
-#Some broadcasts don't download
-#TBR, WSN, BAL, MIL
 def iterate_broadcast(teams, downloadedFiles):
 
 	for team in sorted(teams.keys()):
@@ -379,11 +442,14 @@ def iterate_promo(teams, downloadedFiles):
 
 	return True
 
-def iterate_allergy(teams, downloadedFiles):
-	allergycodes = get_allergycodes()
+def iterate_allergy(teams, downloadedFiles, havenewCodes = False):
+	allergycodes = False
+	if havenewCodes:
+		allergycodes = get_allergycodes()
+
 	urls = []
 	for team in sorted(teams.keys()):
-		results = download_allergy(teams[team], team, iterate_allergy)
+		results = download_allergy(teams[team], team, allergycodes)
 		
 		if results['html'] is True:
 			continue
@@ -397,6 +463,24 @@ def iterate_allergy(teams, downloadedFiles):
 
 	return urls
 
+def iterate_overall(overall, downloadedFiles):
+
+	wildcard = download_wildcard(overall)
+	if wildcard['html'] is not True:
+		print('Downloading wildcard     for {0}: \t link: {1}'.format(overall, overall['wildcard standings']))
+	
+	data_wild = wildcard['datafile']
+	downloadedFiles['ALL']['Wildcard'] = {'File': os.path.abspath(data_wild), 'Size': os.path.getsize(data_wild)}	
+
+	standings = download_standings(overall)
+	if standings['html'] is not True:
+		print('Downloading standings     for {0}: \t link: {1}'.format(overall, overall['standings']))
+	
+	data_stand = standings['datafile']
+	downloadedFiles['ALL']['Standings'] = {'File': os.path.abspath(data_stand), 'Size': os.path.getsize(data_stand)}
+
+	return True
+
 def load_teams():
 	teams = defaultdict(dict)
 	downloadedFiles = defaultdict(dict)
@@ -409,19 +493,141 @@ def load_teams():
 		downloadedFiles[team] = defaultdict(dict)
 	
 	overall = teams.pop('ALL')
+	overall = {key: val for key, val in overall.items() if val}
 
 	return teams, overall, downloadedFiles
 
-def make_email(teams, overall, downloadedFiles):
-	pass
+def make_list(teams, overall, downloadedFiles):
+	
+	date = time.strftime("_%m_%d_%Y")	
+	
+	infile = open('Data/'+date+'/List'+date+'.csv', 'w', encoding = 'utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
+
+	new_allergy = open('Data/'+date+'/allergycodes'+date+'.csv', 'w', encoding = 'utf-8', newline = '')
+	allergy_csv = csv.writer(new_allergy, quoting=csv.QUOTE_ALL)
+	allergy_csv.writerow(['TEAM', 'Allergy', 'id', 'URL', 'value'])
+
+	for team, data in sorted(downloadedFiles.items()):
+		for point, contents in data.items():
+			
+			if point == 'Allergy':
+				for key, value in contents.items():
+						if key == 'URL':
+
+							first_url = value[0]
+							allergy_csv.writerow([team, point, key, first_url, ''])
+							[allergy_csv.writerow(['','', key, url, '']) for url in value[1:]]
+				
+				csvf.writerow([team, point, 'Size', contents['Size'], 'File', contents['File'] ])
+
+			else:
+				try:
+					csvf.writerow([team, point, 'Size', contents['Size'], 'File', contents['File'] ])
+				except KeyError:
+					csvf.writerow(['Some error happened here', team, point])
+	
+	new_allergy.close()
+	infile.close()
+	return True
+
+def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
+
+	if command == 'iterate_allergy':
+		start = time.time()
+		iterate_allergy(teams, downloadedFiles, subcommand) #subcommand allows us to dictate whether the file is updated
+		minutes, seconds = divmod(time.time() - start, 60)
+		print('\n\n\nFinished downloading allergy data: {0} minutes and {1} seconds'.format(minutes, seconds))
+	
+	elif command == 'iterate_stats':
+		start = time.time()
+		iterate_stats(teams, downloadedFiles)
+		minutes, seconds = divmod(time.time() - start, 60)
+		print('\n\n\nFinished downloading stats data: {0} minutes and {1} seconds'.format(minutes, seconds))
+	
+	elif command == 'iterate_schedules':
+		start = time.time()
+		iterate_schedules(teams, downloadedFiles)	
+		minutes, seconds = divmod(time.time() - start, 60)
+		print('\n\n\nFinished downloading schedules data: {0} minutes and {1} seconds'.format(minutes, seconds))
+	
+	elif command == 'iterate_promo':
+		start = time.time()
+		iterate_promo(teams, downloadedFiles)
+		minutes, seconds = divmod(time.time() - start, 60)
+		print('\n\n\nFinished downloading promo data: {0} minutes and {1} seconds'.format(minutes, seconds))
+	
+	elif command == 'iterate_broadcast':
+		start = time.time()
+		iterate_broadcast(teams, downloadedFiles)
+		minutes, seconds = divmod(time.time() - start, 60)
+		print('\n\n\nFinished downloading broadcast data: {0} minutes and {1} seconds'.format(minutes, seconds))
+	
+	elif command == 'iterate_overall':
+		start = time.time()
+		iterate_overall(overall, downloadedFiles)
+		minutes, seconds = divmod(time.time() - start, 60)
+		print('\n\n\nFinished downloading allergy data: {0} minutes and {1} seconds'.format(minutes, seconds))
+	
+	elif command == 'iterate_all':
+		
+		start = time.time()
+		iterate_stats(teams, downloadedFiles)
+		iterate_schedules(teams, downloadedFiles)
+		iterate_promo(teams, downloadedFiles)
+		iterate_broadcast(teams, downloadedFiles)
+		iterate_allergy(teams, downloadedFiles)
+		iterate_overall(overall, downloadedFiles)
+		minutes, seconds = divmod(time.time() - start, 60)
+		
+		if subcommand is True:
+			send_update(True)
+		
+		elif subcommand is 'email_sum':
+			send_update(False)
+		
+		else:
+			print('No emails')
+
+		print('\n\n\nFinished downloading all of the data: {0} minutes and {1} seconds'.format(minutes, seconds))
+	
+	elif command == 'send_email':
+		if subcommand is True:
+			send_update(True)
+		elif subcommand is 'email_sum':
+			send_update(False)
+		else:
+			print('No emails')	
+
+		
+
+def send_update(wantZip = True):
+	import email_data
+
+	date = time.strftime("_%m_%d_%Y")
+	directory = os.path.join('Data/', date)
+	date.translate(str.maketrans('_', '/'))
+	email_data.send_email(date, directory, wantZip) #Add third argument sendZip = False in order to only send main results
+
+	return True
+
 
 def main():
+	
 	teams, overall, downloadedFiles = load_teams()
+	
 	iterate_stats(teams, downloadedFiles)
+	
 	iterate_schedules(teams, downloadedFiles)
+	
 	iterate_promo(teams, downloadedFiles)
+	
 	iterate_broadcast(teams, downloadedFiles)
+	
 	iterate_allergy(teams, downloadedFiles)
+	
+	iterate_overall(overall, downloadedFiles)
+	
 	return teams
 
 if __name__ == "__main__":

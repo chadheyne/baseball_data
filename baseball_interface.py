@@ -12,6 +12,7 @@
 ###### Possible for the button to trigger a new window that will stream download progress?
 ##########################################################################################
 from PyQt4 import QtCore, QtGui
+from PyQt4.Qt import *
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -27,6 +28,72 @@ except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
 
+
+class EmittingStream(QtCore.QObject):
+
+    textWritten = QtCore.pyqtSignal(str)
+
+    def write(self, text):
+        self.textWritten.emit(str(text))
+
+
+class Window(QtGui.QWidget):
+    def __init__(self, buttontext, command):
+        QtGui.QWidget.__init__(self)
+        self.command = command
+        layout = QtGui.QVBoxLayout(self)
+        
+        self.textEdit = QtGui.QTextEdit()
+        layout.addWidget(self.textEdit)
+        if buttontext == 'Download Pollen':
+            newPollen = QtGui.QPushButton('Updated data already')
+            oldPollen = QtGui.QPushButton('No New Data')
+            layout.addWidget(newPollen)
+            layout.addWidget(oldPollen)
+            newPollen.clicked.connect(self.handleTrue)
+            oldPollen.clicked.connect(self.handleFalse)
+        elif buttontext == 'Download Everything' or buttontext == 'Send a new email':
+            zipEmail = QtGui.QPushButton('Download and Email Zip File')
+            layout.addWidget(zipEmail)
+            sumEmail = QtGui.QPushButton('Download and Email Summary File')
+            layout.addWidget(sumEmail)
+            noEmail = QtGui.QPushButton('Download and Don\'t Email')
+            layout.addWidget(noEmail)
+            zipEmail.clicked.connect(self.handleTrue)
+            sumEmail.clicked.connect(self.handleAlt)
+            noEmail.clicked.connect(self.handleFalse)
+        else:
+            downloadBtn = QtGui.QPushButton(buttontext)
+            layout.addWidget(downloadBtn)
+            downloadBtn.clicked.connect(self.handleFalse)
+
+        
+       
+        sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
+    
+    def handleTrue(self, command):
+        import download
+        teams, overall, downloadedFiles = download.load_teams()
+        download.processGUI(self.command, teams, overall, downloadedFiles, True)
+
+    def handleFalse(self, command):
+        import download
+        teams, overall, downloadedFiles = download.load_teams()
+        download.processGUI(self.command, teams, overall, downloadedFiles, False)
+
+    def handleAlt(self, command):
+        import download
+        teams, overall, downloadedFiles = download.load_teams()
+        download.processGUI(self.command, teams, overall, downloadedFiles, 'email_sum')
+
+    def normalOutputWritten(self, text):
+        cursor = self.textEdit.textCursor()
+        cursor.movePosition(QtGui.QTextCursor.End)
+        cursor.insertText(text)
+        self.textEdit.setTextCursor(cursor)
+        self.textEdit.ensureCursorVisible()
+
+
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
@@ -39,21 +106,39 @@ class Ui_MainWindow(object):
         self.verticalLayout = QtGui.QVBoxLayout(self.verticalLayoutWidget)
         self.verticalLayout.setMargin(0)
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
-        self.pushButton_2 = QtGui.QPushButton(self.verticalLayoutWidget)
-        self.pushButton_2.setObjectName(_fromUtf8("pushButton_2"))
-        self.verticalLayout.addWidget(self.pushButton_2)
-        self.pushButton_3 = QtGui.QPushButton(self.verticalLayoutWidget)
-        self.pushButton_3.setObjectName(_fromUtf8("pushButton_3"))
-        self.verticalLayout.addWidget(self.pushButton_3)
-        self.pushButton_4 = QtGui.QPushButton(self.verticalLayoutWidget)
-        self.pushButton_4.setObjectName(_fromUtf8("pushButton_4"))
-        self.verticalLayout.addWidget(self.pushButton_4)
-        self.pushButton_5 = QtGui.QPushButton(self.verticalLayoutWidget)
-        self.pushButton_5.setObjectName(_fromUtf8("pushButton_5"))
-        self.verticalLayout.addWidget(self.pushButton_5)
-        self.pushButton = QtGui.QPushButton(self.verticalLayoutWidget)
-        self.pushButton.setObjectName(_fromUtf8("pushButton"))
-        self.verticalLayout.addWidget(self.pushButton)
+        
+        statsBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        statsBtn.setObjectName(_fromUtf8("statsBtn"))
+        self.verticalLayout.addWidget(statsBtn)
+        
+        schedBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        schedBtn.setObjectName(_fromUtf8("schedBtn"))
+        self.verticalLayout.addWidget(schedBtn)
+        
+        broadBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        broadBtn.setObjectName(_fromUtf8("broadBtn"))
+        self.verticalLayout.addWidget(broadBtn)
+        
+        promoBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        promoBtn.setObjectName(_fromUtf8("promoBtn"))
+        self.verticalLayout.addWidget(promoBtn)
+        
+        pollenBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        pollenBtn.setObjectName(_fromUtf8("pollenBtn"))
+        self.verticalLayout.addWidget(pollenBtn)
+        
+        overallBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        overallBtn.setObjectName(_fromUtf8("overallBtn"))
+        self.verticalLayout.addWidget(overallBtn)
+
+        allBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        allBtn.setObjectName(_fromUtf8("allBtn"))
+        self.verticalLayout.addWidget(allBtn)
+
+        emailBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        emailBtn.setObjectName(_fromUtf8("emailBtn"))
+        self.verticalLayout.addWidget(emailBtn)
+
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 25))
@@ -69,19 +154,85 @@ class Ui_MainWindow(object):
         self.menu_File.addAction(self.action_Quit)
         self.menubar.addAction(self.menu_File.menuAction())
 
+        overallBtn.setText(_translate("MainWindow", "Download Overall Data", None))
+        statsBtn.setText(_translate("MainWindow", "Download Stats Data", None))
+        schedBtn.setText(_translate("MainWindow", "Download Schedule Data", None))
+        broadBtn.setText(_translate("MainWindow", "Download Broadcast Data", None))
+        promoBtn.setText(_translate("MainWindow", "Download Promotion Data", None))
+        pollenBtn.setText(_translate("MainWindow", "Download Pollen Data", None))
+        allBtn.setText(_translate("MainWindow", "Download Everything", None))
+        emailBtn.setText(_translate("MainWindow", "Send a new email", None))
         self.retranslateUi(MainWindow)
+
+        overallBtn.clicked.connect(self.overall)
+        statsBtn.clicked.connect(self.stats)
+        schedBtn.clicked.connect(self.schedule)
+        broadBtn.clicked.connect(self.broadcast)
+        promoBtn.clicked.connect(self.promo)
+        pollenBtn.clicked.connect(self.pollen)
+        allBtn.clicked.connect(self.downloadAll)
+        emailBtn.clicked.connect(self.newEmail)
+
         QtCore.QObject.connect(self.action_Quit, QtCore.SIGNAL(_fromUtf8("triggered()")), MainWindow.close)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow", None))
-        self.pushButton_2.setText(_translate("MainWindow", "Download Stats Data", None))
-        self.pushButton_3.setText(_translate("MainWindow", "Download Schedule Data", None))
-        self.pushButton_4.setText(_translate("MainWindow", "Download Broadcast Data", None))
-        self.pushButton_5.setText(_translate("MainWindow", "Download Promotion Data", None))
-        self.pushButton.setText(_translate("MainWindow", "Download Pollen Data", None))
+
         self.menu_File.setTitle(_translate("MainWindow", "&File", None))
         self.action_Quit.setText(_translate("MainWindow", "&Quit", None))
+
+    def pollen(self):
+        print("Opening a new popup window...")
+        self.w = Window('Download Pollen', 'iterate_allergy')
+
+        self.w.show()
+
+    def stats(self):
+        
+        print("Opening a new popup window...")
+        self.w = Window('Download Stats', 'iterate_stats')
+        
+        self.w.show()
+
+    def promo(self):
+
+        print("Opening a new popup window...")
+        self.w = Window('Download Promos', 'iterate_promo')
+
+        self.w.show()
+
+    def broadcast(self):
+
+        print("Opening a new popup window...")
+        self.w = Window('Download Broadcast', 'iterate_broadcast')
+
+        self.w.show()
+
+    def schedule(self):
+
+        print("Opening a new popup window...")
+        self.w = Window('Download Schedule', 'iterate_schedules')
+
+        self.w.show()
+    
+    def overall(self):
+        print("Opening a new popup window...")
+        self.w = Window('Download Overall', 'iterate_overall')
+
+        self.w.show()
+
+    def downloadAll(self):
+        print("Opening a new popup window...")
+        self.w = Window('Download Everything', 'iterate_all')
+
+        self.w.show()
+
+    def newEmail(self):
+        print("Opening a new popup window...")
+        self.w = Window('Send a new email', 'send_email')
+
+        self.w.show()
 
 
 if __name__ == "__main__":
