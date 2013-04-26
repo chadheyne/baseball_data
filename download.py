@@ -621,7 +621,11 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 		iterate_stats(teams, downloadedFiles)
 		iterate_schedules(teams, downloadedFiles)
 		iterate_broadcast(teams, downloadedFiles)
-		iterate_allergy(teams, downloadedFiles)
+		try:
+			iterate_allergy(teams, downloadedFiles, True)
+		except FileNotFoundError:
+			iterate_allergy(teams, downloadedFiles, False) 
+
 		iterate_overall(overall, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		
@@ -652,8 +656,6 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 
 
 def ocr_images(urls, downloadedFiles):
-	from tesserwrap import Tesseract
-	from PIL import Image
 	import io
 
 	for url in urls:

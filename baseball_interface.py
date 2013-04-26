@@ -20,7 +20,16 @@ from PyQt4.QtCore import *
 from PyQt4.QtWebKit import *
 import download
 import datetime
+import time, os, sys
 
+date = time.strftime("_%m_%d_%Y")
+directory = os.path.join('Data', date)
+
+if not os.path.exists(directory):
+	os.makedirs(directory)
+f = open('Data/'+date+'/Log.txt', 'a')
+
+sys.stdout = f
 teams, overall, downloadedFiles = download.load_teams()
 
 try:
@@ -236,7 +245,7 @@ class Ui_MainWindow(object):
 
 
 if __name__ == "__main__":
-	import sys, time, os
+	import sys
 	app = QtGui.QApplication(sys.argv)
 	MainWindow = QtGui.QMainWindow()
 
@@ -244,13 +253,9 @@ if __name__ == "__main__":
 	ui.setupUi(MainWindow)
 	MainWindow.show()
 	app.exec_()
-	app.quit()
+	
 	from promo_interface import Downloader
 
-	date = time.strftime("_%m_%d_%Y")
-	f = open('Data/'+date+'/Log.txt', 'a')
-
-	sys.stdout = f
 	teams2 = dict(teams)
 
 	for team in teams2.keys():
@@ -259,7 +264,7 @@ if __name__ == "__main__":
 			del teams[team]
 			print("Already got it team {0}: url - {1}".format(team, teams2[team]['promo']))
 	if teams:
-
+		app.quit()
 
 		downloader = Downloader(sorted(list(teams.keys())), teams)
 		downloader.done.connect(app.quit)
