@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 -u
 
 from bs4 import BeautifulSoup
 from PyQt4.QtGui import *
@@ -12,6 +12,7 @@ import sys
 import time
 import csv
 import os
+import datetime
 
 NUM_THREADS = 2
 
@@ -211,7 +212,7 @@ def download_allergy(team, name, codes):
 
 	datafile = os.path.join(directory,name+date+".csv")
 
-	if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
+	if os.path.exists(datafile) and os.path.getsize(datafile) > 0 and not codes:
 		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['allergy']))
 		return {'html': True, 'datafile': datafile, 'url': 'Already downloaded'}
 
@@ -376,7 +377,7 @@ def get_allergycodes(date):
 
 	allergy = defaultdict(dict)
 
-	allergydata = csv.DictReader(open("Data/"+date+"allergycodes"+date+".csv"))
+	allergydata = csv.DictReader(open("Data/"+date+"/allergycodes"+date+".csv"))
 	for row in allergydata:
 		allergy[row['URL']] = row['value']
 
@@ -456,7 +457,8 @@ def iterate_promo(teams, downloadedFiles, mainQt=False):
 def iterate_allergy(teams, downloadedFiles, havenewCodes = False):
 	allergycodes = False
 	if havenewCodes:
-		allergycodes = get_allergycodes()
+		date = time.strftime("_%m_%d_%Y")
+		allergycodes = get_allergycodes(date)
 
 	urls = []
 	for team in sorted(teams.keys()):
@@ -508,100 +510,128 @@ def load_teams():
 
 	return teams, overall, downloadedFiles
 
-def make_list(teams, overall, downloadedFiles):
+def make_list():
 	
 	date = time.strftime("_%m_%d_%Y")	
 	
 	infile = open('Data/'+date+'/List'+date+'.csv', 'w', encoding = 'utf-8', newline = '')
 	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
 
-	new_allergy = open('Data/'+date+'/allergycodes'+date+'.csv', 'w', encoding = 'utf-8', newline = '')
-	allergy_csv = csv.writer(new_allergy, quoting=csv.QUOTE_ALL)
-	allergy_csv.writerow(['TEAM', 'Allergy', 'id', 'URL', 'value'])
-
-	for team, data in sorted(downloadedFiles.items()):
-		for point, contents in data.items():
-			
-			if point == 'Allergy':
-				for key, value in contents.items():
-						if key == 'URL':
-
-							first_url = value[0]
-							allergy_csv.writerow([team, point, key, first_url, ''])
-							[allergy_csv.writerow(['','', key, url, '']) for url in value[1:]]
-				
-				csvf.writerow([team, point, 'Size', contents['Size'], 'File', contents['File'] ])
-
-			else:
-				try:
-					csvf.writerow([team, point, 'Size', contents['Size'], 'File', contents['File'] ])
-				except KeyError:
-					csvf.writerow(['Some error happened here', team, point])
+	csvf.writerow(['Team', 'Content', 'Size', 'Size', 'File', 'Full Path'])
+	for root, dirs, files in os.walk('Data/'+date):
+		for f in files:
+			if not f.endswith('.csv') or f.startswith('List') or f.startswith('allergycodes'):
+				continue
+			point = os.path.dirname(os.path.join(root,f)).split('/')[-1]
+			team = f.split('_')[0]
+			fullname = os.path.abspath(os.path.join(root,f))
+			size = os.path.getsize(fullname)
+			csvf.writerow([team, point, '', size, '', fullname])
 	
-	new_allergy.close()
 	infile.close()
 	return True
 
-def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
+def new_allergies(links):
 
+	date = time.strftime("_%m_%d_%Y")	
+	infile = open('Data/'+date+'/allergycodes'+date+'.csv', 'a', encoding = 'utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
+	csvf.writerow(['URL', 'value'])
+	for link in links:
+		csvf.writerow([link, 'empty'])
+
+
+def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
+	date = time.strftime("_%m_%d_%Y")
+	f = open('Data/'+date+'/Log.txt', 'a')
+
+	sys.stdout = f
 	if command == 'iterate_allergy':
 		start = time.time()
-		iterate_allergy(teams, downloadedFiles, subcommand) #subcommand allows us to dictate whether the file is updated
+		print('\n\n\nStarted downloading allergy data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
+		newcodes = iterate_allergy(teams, downloadedFiles, subcommand) #subcommand allows us to dictate whether the file is updated
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading allergy data: {0} minutes and {1} seconds'.format(minutes, seconds))
-		make_list(teams, overall, downloadedFiles)
-	
+		make_list()
+		new_allergies(newcodes)
+		sys.stdout.flush()
+		sys.stdout=sys.__stdout__
+		f.close()
+
+
 	elif command == 'iterate_stats':
 		start = time.time()
+		print('\n\n\nStarted downloading stats data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		iterate_stats(teams, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading stats data: {0} minutes and {1} seconds'.format(minutes, seconds))
-		make_list(teams, overall, downloadedFiles)
-	
+		make_list()
+		sys.stdout.flush()
+		sys.stdout=sys.__stdout__
+		f.close()
+
 	elif command == 'iterate_schedules':
 		start = time.time()
+		print('\n\n\nStarted downloading schedules data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		iterate_schedules(teams, downloadedFiles)	
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading schedules data: {0} minutes and {1} seconds'.format(minutes, seconds))
-		make_list(teams, overall, downloadedFiles)
-	
+		make_list()
+		sys.stdout.flush()
+		sys.stdout=sys.__stdout__
+		f.close()
+
 	elif command == 'iterate_promo':
 		start = time.time()
+		print('\n\n\nStarted downloading promo data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		iterate_promo(teams, downloadedFiles, True)
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading promo data: {0} minutes and {1} seconds'.format(minutes, seconds))
-		make_list(teams, overall, downloadedFiles)
-	
+		make_list()
+		sys.stdout.flush()
+		sys.stdout=sys.__stdout__
+		f.close()
+
 	elif command == 'iterate_broadcast':
 		start = time.time()
+		print('\n\n\nStarted downloading broadcast data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		iterate_broadcast(teams, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading broadcast data: {0} minutes and {1} seconds'.format(minutes, seconds))
-		make_list(teams, overall, downloadedFiles)
-	
+		make_list()
+		sys.stdout.flush()
+		sys.stdout=sys.__stdout__
+		f.close()
+
 	elif command == 'iterate_overall':
 		start = time.time()
+		print('\n\n\nStarted downloading overall data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		iterate_overall(overall, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
-		print('\n\n\nFinished downloading allergy data: {0} minutes and {1} seconds'.format(minutes, seconds))
-		make_list(teams, overall, downloadedFiles)
-	
+		print('\n\n\nFinished downloading overall data: {0} minutes and {1} seconds'.format(minutes, seconds))
+		make_list()
+		sys.stdout.flush()
+		sys.stdout=sys.__stdout__
+		f.close()
+
 	elif command == 'iterate_all':
 		
 		start = time.time()
+		print('\n\n\nStarted downloading all of the data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		iterate_stats(teams, downloadedFiles)
 		iterate_schedules(teams, downloadedFiles)
-		iterate_promo(teams, downloadedFiles)
 		iterate_broadcast(teams, downloadedFiles)
 		iterate_allergy(teams, downloadedFiles)
 		iterate_overall(overall, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		
-		make_list(teams, overall, downloadedFiles)
-		
+		make_list()
+		sys.stdout.flush()
+		sys.stdout=sys.__stdout__
+		f.close()
 		if subcommand is True:
 			send_update(True)
-		
+			
 		elif subcommand is 'email_sum':
 			send_update(False)
 		
@@ -609,15 +639,16 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 			print('No emails')
 
 		print('\n\n\nFinished downloading all of the data: {0} minutes and {1} seconds'.format(minutes, seconds))
-	
 	elif command == 'send_email':
+		sys.stdout.flush()
+		sys.stdout=sys.__stdout__
+		f.close()
 		if subcommand is True:
 			send_update(True)
 		elif subcommand is 'email_sum':
 			send_update(False)
 		else:
 			print('No emails')	
-	
 
 
 def ocr_images(urls, downloadedFiles):
@@ -634,7 +665,12 @@ def ocr_images(urls, downloadedFiles):
 		text = tr.ocr_image(img)
 		print(text.split('\n')[0])
 
-		
+def load_json(urls, downloadedFiles):
+	import json
+	import requests
+	jsonurl = requests.request('GET', urls)
+	jsondata = jsonurl.json()
+	
 
 def send_update(wantZip = True):
 	import email_data
@@ -648,28 +684,9 @@ def send_update(wantZip = True):
 
 
 def main():
-	
-	start = time.time()
 	teams, overall, downloadedFiles = load_teams()
-	
-	iterate_stats(teams, downloadedFiles)
-	
-	iterate_schedules(teams, downloadedFiles)
-	
-	iterate_promo(teams, downloadedFiles)
-	
-	iterate_broadcast(teams, downloadedFiles)
-	
-	iterate_allergy(teams, downloadedFiles)
-	
-	iterate_overall(overall, downloadedFiles)
-	
-	make_list(teams, overall, downloadedFiles)
-	
-	minutes, seconds = divmod(time.time() - start, 60)
-	print("Finished downloading all of the data: {0} minutes and {1} seconds".format(minutes, seconds))
-
-	return teams
+	iterate_promo(teams, downloadedFiles, False)
+	processGUI(iterate_all, teams, overall, downloadedFiles, True)
 
 if __name__ == "__main__":
 	main()

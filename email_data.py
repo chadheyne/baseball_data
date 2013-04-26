@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, re
+import os, re, sys
 import smtplib
 
 from email import encoders
@@ -15,7 +15,7 @@ SMTP_PORT = 587
 def zipdir(path, zipfile):
 	for root, dirs, files in os.walk(path):
 		for f in files:
-			if not f.endswith('.csv'):
+			if not f.endswith('.csv') and not f.endswith('.txt'):
 				continue
 			zipfile.write(os.path.join(root, f) )
 
@@ -55,9 +55,11 @@ def send_email(date, directory, sendZip = True):
 		msg.attach(part)
 
 	else:
+
 		files = os.listdir(directory)
-		csvsearch = re.compile(".csv", re.IGNORECASE)
+		csvsearch = re.compile(".csv|.txt", re.IGNORECASE)
 		files = list(filter(csvsearch.search, files))
+		
 		for filename in files:
 
 			path =  os.path.abspath(os.path.join(directory, filename))

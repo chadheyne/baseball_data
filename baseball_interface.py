@@ -11,15 +11,15 @@
 ##########################################################################################
 ###### Possible for the button to trigger a new window that will stream download progress?
 ##########################################################################################
+#!/usr/bin/env python3 -u
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.Qt import *
 from PyQt4.QtGui import *
 from PyQt4.QtCore import *
 from PyQt4.QtWebKit import *
-from collections import deque
-import time
-
 import download
+import datetime
 
 teams, overall, downloadedFiles = download.load_teams()
 
@@ -38,44 +38,6 @@ except AttributeError:
 		return QtGui.QApplication.translate(context, text, disambig)
 
 
-class bookie(QObject):
-	def __init__(self, urls, parent=None):
-		super(bookie, self).__init__(parent)
-
-		self.count  = 0
-		self.urls    = urls
-		self.params = range(31) # instead of [1,2,3,4,5,6,7,8,9,10,11,12] and so on...
-
-		Grabber = QWebView # This would be your Grabber class
-
-		self.mapper = QSignalMapper(self)
-		self.mapper.mapped.connect(self.on_mapper_mapped)
-
-		for grabberNumber in range(10): # Create 10 Grabber instances
-			grabber = Grabber()
-			grabber.loadFinished.connect(self.mapper.map)
-
-			self.mapper.setMapping(grabber, grabberNumber)
-
-			grabber.loadFinished.emit(True) # Initialize the grabber by emitting loadFinished
-
-	def on_mapper_mapped(self, gNumber):
-		self.count += 1
-		if self.count < len(self.params):
-			gParam  = self.params[self.count]   
-			grabber = self.mapper.mapping(gNumber)
-			url = self.urls.popleft()
-			grabber.setUrl(QUrl(url))
-			grabber.load(QUrl(url))
-			grabber.show()
-			print(grabber.url())
-			# Next 2 lines for testing purposes, remove & uncomment the previous line
-			test = grabber.page().mainFrame()
-			html = test.toHtml()
-			print("GRABBER:", gNumber, "PARAMETER:", gParam,html)
-			#QTimer.singleShot(1, lambda:grabber.loadFinished.emit(True)) 	
-
-
 class EmittingStream(QtCore.QObject):
 
 	textWritten = QtCore.pyqtSignal(str)
@@ -89,7 +51,7 @@ class Window(QtGui.QWidget):
 		QtGui.QWidget.__init__(self)
 		self.command = command
 		layout = QtGui.QVBoxLayout(self)
-		
+		self.setWindowTitle(buttontext)
 		self.textEdit = QtGui.QTextEdit()
 		layout.addWidget(self.textEdit)
 		if buttontext == 'Download Pollen':
@@ -109,41 +71,32 @@ class Window(QtGui.QWidget):
 			zipEmail.clicked.connect(self.handleTrue)
 			sumEmail.clicked.connect(self.handleAlt)
 			noEmail.clicked.connect(self.handleFalse)
-		elif buttontext == 'Download Promos':
-			downloadPromo = QtGui.QPushButton(buttontext)
-			layout.addWidget(downloadPromo)
-			downloadPromo.clicked.connect(self.handlePromo)
 		else:
 			downloadBtn = QtGui.QPushButton(buttontext)
 			layout.addWidget(downloadBtn)
 			downloadBtn.clicked.connect(self.handleFalse)
 
+
+		#sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
 		
-		sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
-	
 	def handleTrue(self, command):
 		import download
+		self.normalOutputWritten('Started downloading {0}: {1}\n\n\n'.format(self.command, datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		teams, overall, downloadedFiles = download.load_teams()
 		download.processGUI(self.command, teams, overall, downloadedFiles, True)
 
 	def handleFalse(self, command):
 		import download
+		self.normalOutputWritten('Started downloading {0}: {1}\n\n\n'.format(self.command, datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		teams, overall, downloadedFiles = download.load_teams()
 		download.processGUI(self.command, teams, overall, downloadedFiles, False)
 
 	def handleAlt(self, command):
 		import download
+		self.normalOutputWritten('Started downloading Everything: {0}\n\n\n'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		teams, overall, downloadedFiles = download.load_teams()
 		download.processGUI(self.command, teams, overall, downloadedFiles, 'email_sum')
 
-	def handlePromo(self, command):
-		import download
-		teams, overall, downloadedFiles = download.load_teams()
-		urls = deque([teams[team]['promo'] for team in teams.keys() if teams[team]['promo'] ])
-		
-		test = bookie(urls)
-
-		#download.processGUI(self.command, teams, overall, downloadedFiles)
 
 	def normalOutputWritten(self, text):
 		cursor = self.textEdit.textCursor()
@@ -155,7 +108,7 @@ class Window(QtGui.QWidget):
 
 class Ui_MainWindow(object):
 	def setupUi(self, MainWindow):
-		MainWindow.setObjectName(_fromUtf8("MainWindow"))
+		MainWindow.setObjectName(_fromUtf8("Download Baseball Data"))
 		MainWindow.resize(800, 600)
 		self.centralwidget = QtGui.QWidget(MainWindow)
 		self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
@@ -177,10 +130,6 @@ class Ui_MainWindow(object):
 		broadBtn = QtGui.QPushButton(self.verticalLayoutWidget)
 		broadBtn.setObjectName(_fromUtf8("broadBtn"))
 		self.verticalLayout.addWidget(broadBtn)
-
-		promoBtn = QtGui.QPushButton(self.verticalLayoutWidget)
-		promoBtn.setObjectName(_fromUtf8("promoBtn"))
-		self.verticalLayout.addWidget(promoBtn)
 
 		pollenBtn = QtGui.QPushButton(self.verticalLayoutWidget)
 		pollenBtn.setObjectName(_fromUtf8("pollenBtn"))
@@ -217,7 +166,6 @@ class Ui_MainWindow(object):
 		statsBtn.setText(_translate("MainWindow", "Download Stats Data", None))
 		schedBtn.setText(_translate("MainWindow", "Download Schedule Data", None))
 		broadBtn.setText(_translate("MainWindow", "Download Broadcast Data", None))
-		promoBtn.setText(_translate("MainWindow", "Download Promotion Data", None))
 		pollenBtn.setText(_translate("MainWindow", "Download Pollen Data", None))
 		allBtn.setText(_translate("MainWindow", "Download Everything", None))
 		emailBtn.setText(_translate("MainWindow", "Send a new email", None))
@@ -227,7 +175,6 @@ class Ui_MainWindow(object):
 		statsBtn.clicked.connect(self.stats)
 		schedBtn.clicked.connect(self.schedule)
 		broadBtn.clicked.connect(self.broadcast)
-		promoBtn.clicked.connect(self.promo)
 		pollenBtn.clicked.connect(self.pollen)
 		allBtn.clicked.connect(self.downloadAll)
 		emailBtn.clicked.connect(self.newEmail)
@@ -236,7 +183,7 @@ class Ui_MainWindow(object):
 		QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
 	def retranslateUi(self, MainWindow):
-		MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow", None))
+		MainWindow.setWindowTitle(_translate("MainWindow", "Download Baseball Data", None))
 
 		self.menu_File.setTitle(_translate("MainWindow", "&File", None))
 		self.action_Quit.setText(_translate("MainWindow", "&Quit", None))
@@ -252,13 +199,6 @@ class Ui_MainWindow(object):
 		print("Opening a new popup window...")
 		self.w = Window('Download Stats', 'iterate_stats')
 		
-		self.w.show()
-
-	def promo(self):
-
-		print("Opening a new popup window...")
-		self.w = Window('Download Promos', 'iterate_promo')
-
 		self.w.show()
 
 	def broadcast(self):
@@ -298,6 +238,7 @@ if __name__ == "__main__":
 	import sys
 	app = QtGui.QApplication(sys.argv)
 	MainWindow = QtGui.QMainWindow()
+
 	ui = Ui_MainWindow()
 	ui.setupUi(MainWindow)
 	MainWindow.show()
