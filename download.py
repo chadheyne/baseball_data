@@ -360,6 +360,7 @@ def get_promos(teams):
 	renders = [Render(urls) for i in range(NUM_THREADS)]
 	app.exec_()
 
+
 	for team in teams:
 		try:
 			if not teams[team]['promo'] or not Render.data[teams[team]['promo']]:
@@ -426,10 +427,20 @@ def iterate_broadcast(teams, downloadedFiles):
 
 	return True	
 
-def iterate_promo(teams, downloadedFiles):
+def iterate_promo(teams, downloadedFiles, mainQt=False):
 
-	teams = get_promos(teams)
+	if mainQt is False:
+		teams = get_promos(teams)
+	
 	for team in sorted(teams.keys()):
+		print(teams[team].keys())
+		#try:
+		#	if not teams[team]['html']:
+		#		print("No HTML here.")
+		#		continue
+		#except KeyError:
+		#	print(teams[team].keys())
+		#	continue
 		results = download_promo(teams[team], team)
 		
 		if results['html'] is True:
@@ -538,36 +549,42 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 		iterate_allergy(teams, downloadedFiles, subcommand) #subcommand allows us to dictate whether the file is updated
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading allergy data: {0} minutes and {1} seconds'.format(minutes, seconds))
+		make_list(teams, overall, downloadedFiles)
 	
 	elif command == 'iterate_stats':
 		start = time.time()
 		iterate_stats(teams, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading stats data: {0} minutes and {1} seconds'.format(minutes, seconds))
+		make_list(teams, overall, downloadedFiles)
 	
 	elif command == 'iterate_schedules':
 		start = time.time()
 		iterate_schedules(teams, downloadedFiles)	
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading schedules data: {0} minutes and {1} seconds'.format(minutes, seconds))
+		make_list(teams, overall, downloadedFiles)
 	
 	elif command == 'iterate_promo':
 		start = time.time()
-		iterate_promo(teams, downloadedFiles)
+		iterate_promo(teams, downloadedFiles, True)
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading promo data: {0} minutes and {1} seconds'.format(minutes, seconds))
+		make_list(teams, overall, downloadedFiles)
 	
 	elif command == 'iterate_broadcast':
 		start = time.time()
 		iterate_broadcast(teams, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading broadcast data: {0} minutes and {1} seconds'.format(minutes, seconds))
+		make_list(teams, overall, downloadedFiles)
 	
 	elif command == 'iterate_overall':
 		start = time.time()
 		iterate_overall(overall, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		print('\n\n\nFinished downloading allergy data: {0} minutes and {1} seconds'.format(minutes, seconds))
+		make_list(teams, overall, downloadedFiles)
 	
 	elif command == 'iterate_all':
 		
@@ -600,6 +617,8 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 			send_update(False)
 		else:
 			print('No emails')	
+	
+
 
 def ocr_images(urls, downloadedFiles):
 	from tesserwrap import Tesseract

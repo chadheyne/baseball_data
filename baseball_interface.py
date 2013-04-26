@@ -13,6 +13,15 @@
 ##########################################################################################
 from PyQt4 import QtCore, QtGui
 from PyQt4.Qt import *
+from PyQt4.QtGui import *
+from PyQt4.QtCore import *
+from PyQt4.QtWebKit import *
+from collections import deque
+import time
+
+import download
+
+teams, overall, downloadedFiles = download.load_teams()
 
 try:
 	_fromUtf8 = QtCore.QString.fromUtf8
@@ -27,6 +36,44 @@ try:
 except AttributeError:
 	def _translate(context, text, disambig):
 		return QtGui.QApplication.translate(context, text, disambig)
+
+
+class bookie(QObject):
+	def __init__(self, urls, parent=None):
+		super(bookie, self).__init__(parent)
+
+		self.count  = 0
+		self.urls    = urls
+		self.params = range(31) # instead of [1,2,3,4,5,6,7,8,9,10,11,12] and so on...
+
+		Grabber = QWebView # This would be your Grabber class
+
+		self.mapper = QSignalMapper(self)
+		self.mapper.mapped.connect(self.on_mapper_mapped)
+
+		for grabberNumber in range(10): # Create 10 Grabber instances
+			grabber = Grabber()
+			grabber.loadFinished.connect(self.mapper.map)
+
+			self.mapper.setMapping(grabber, grabberNumber)
+
+			grabber.loadFinished.emit(True) # Initialize the grabber by emitting loadFinished
+
+	def on_mapper_mapped(self, gNumber):
+		self.count += 1
+		if self.count < len(self.params):
+			gParam  = self.params[self.count]   
+			grabber = self.mapper.mapping(gNumber)
+			url = self.urls.popleft()
+			grabber.setUrl(QUrl(url))
+			grabber.load(QUrl(url))
+			grabber.show()
+			print(grabber.url())
+			# Next 2 lines for testing purposes, remove & uncomment the previous line
+			test = grabber.page().mainFrame()
+			html = test.toHtml()
+			print("GRABBER:", gNumber, "PARAMETER:", gParam,html)
+			#QTimer.singleShot(1, lambda:grabber.loadFinished.emit(True)) 	
 
 
 class EmittingStream(QtCore.QObject):
@@ -62,13 +109,17 @@ class Window(QtGui.QWidget):
 			zipEmail.clicked.connect(self.handleTrue)
 			sumEmail.clicked.connect(self.handleAlt)
 			noEmail.clicked.connect(self.handleFalse)
+		elif buttontext == 'Download Promos':
+			downloadPromo = QtGui.QPushButton(buttontext)
+			layout.addWidget(downloadPromo)
+			downloadPromo.clicked.connect(self.handlePromo)
 		else:
 			downloadBtn = QtGui.QPushButton(buttontext)
 			layout.addWidget(downloadBtn)
 			downloadBtn.clicked.connect(self.handleFalse)
 
 		
-	 	sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
+		sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
 	
 	def handleTrue(self, command):
 		import download
@@ -84,6 +135,15 @@ class Window(QtGui.QWidget):
 		import download
 		teams, overall, downloadedFiles = download.load_teams()
 		download.processGUI(self.command, teams, overall, downloadedFiles, 'email_sum')
+
+	def handlePromo(self, command):
+		import download
+		teams, overall, downloadedFiles = download.load_teams()
+		urls = deque([teams[team]['promo'] for team in teams.keys() if teams[team]['promo'] ])
+		
+		test = bookie(urls)
+
+		#download.processGUI(self.command, teams, overall, downloadedFiles)
 
 	def normalOutputWritten(self, text):
 		cursor = self.textEdit.textCursor()

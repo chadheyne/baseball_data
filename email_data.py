@@ -22,12 +22,10 @@ def zipdir(path, zipfile):
 
 def send_email(date, directory, sendZip = True):
 
-	sender = 'heyne.chad@gmail.com'
-	password = "cmh070989"
-	recipient = 'chadheyne@gmail.com'
+	sender = 'ashleybaseballdata@gmail.com'
+	password = "Sparky2013"
+	recipient = 'ashleybaseballdata@gmail.com'
 	message = 'Data attached for {0}.'.format(date)
-
-
 
 
 	msg = MIMEMultipart()
