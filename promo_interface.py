@@ -12,6 +12,8 @@ class Downloader(QObject):
 	# To be emitted when every items are downloaded
 	done = pyqtSignal()
 
+
+
 	def __init__(self, urlList, teams, parent = None):
 		super(Downloader, self).__init__(parent)
 		self.urlList = urlList
@@ -46,6 +48,7 @@ class Downloader(QObject):
 		if self.urlList:            
 			self.currentTeam()
 		else:
+
 			self.done.emit()
 
 app = QApplication(sys.argv)

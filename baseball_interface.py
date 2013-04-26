@@ -84,13 +84,13 @@ class Window(QtGui.QWidget):
 		self.normalOutputWritten('Started downloading {0}: {1}\n\n\n'.format(self.command, datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		teams, overall, downloadedFiles = download.load_teams()
 		download.processGUI(self.command, teams, overall, downloadedFiles, True)
-
+		
 	def handleFalse(self, command):
 		import download
 		self.normalOutputWritten('Started downloading {0}: {1}\n\n\n'.format(self.command, datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
 		teams, overall, downloadedFiles = download.load_teams()
 		download.processGUI(self.command, teams, overall, downloadedFiles, False)
-
+		
 	def handleAlt(self, command):
 		import download
 		self.normalOutputWritten('Started downloading Everything: {0}\n\n\n'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
@@ -224,8 +224,8 @@ class Ui_MainWindow(object):
 	def downloadAll(self):
 		print("Opening a new popup window...")
 		self.w = Window('Download Everything', 'iterate_all')
-
 		self.w.show()
+		
 
 	def newEmail(self):
 		print("Opening a new popup window...")
@@ -234,13 +234,43 @@ class Ui_MainWindow(object):
 		self.w.show()
 
 
+
 if __name__ == "__main__":
-	import sys
+	import sys, time, os
 	app = QtGui.QApplication(sys.argv)
 	MainWindow = QtGui.QMainWindow()
 
 	ui = Ui_MainWindow()
 	ui.setupUi(MainWindow)
 	MainWindow.show()
+	app.exec_()
+	app.quit()
+	from promo_interface import Downloader
+
+	date = time.strftime("_%m_%d_%Y")
+	f = open('Data/'+date+'/Log.txt', 'a')
+
+	sys.stdout = f
+	teams2 = dict(teams)
+
+	for team in teams2.keys():
+		directory = os.path.join('Data', date, 'Promo', team+date+".csv")
+		if os.path.exists(directory):
+			del teams[team]
+			print("Already got it team {0}: url - {1}".format(team, teams2[team]['promo']))
+	if teams:
+
+
+		downloader = Downloader(sorted(list(teams.keys())), teams)
+		downloader.done.connect(app.quit)
+		web = QWebView()
+		web.setPage(downloader.page)
+		web.show()
+	else:
+		sys.exit()
+	sys.stdout.flush()
+	sys.stdout=sys.__stdout__
+	f.close()
+
 	sys.exit(app.exec_())
 
