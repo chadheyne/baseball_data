@@ -254,7 +254,6 @@ if __name__ == "__main__":
 	MainWindow.show()
 	app.exec_()
 	
-	from promo_interface import Downloader
 
 	teams2 = dict(teams)
 
@@ -265,8 +264,8 @@ if __name__ == "__main__":
 			print("Already got it team {0}: url - {1}".format(team, teams2[team]['promo']))
 	if teams:
 		app.quit()
-
-		downloader = Downloader(sorted(list(teams.keys())), teams)
+		from promo_interface import Downloader
+		downloader = Downloader(sorted(list(teams.keys())), teams, f)
 		downloader.done.connect(app.quit)
 		web = QWebView()
 		web.setPage(downloader.page)

@@ -14,10 +14,12 @@ class Downloader(QObject):
 
 
 
-	def __init__(self, urlList, teams, parent = None):
+	def __init__(self, urlList, teams, out = None, parent = None):
 		super(Downloader, self).__init__(parent)
 		self.urlList = urlList
-		self.teams = teams     
+		self.teams = teams
+		if out:
+			sys.stdout = out     
 		# As you probably don't need to display the page
 		# you can use QWebPage instead of QWebView
 		self.page = QWebPage(self)      

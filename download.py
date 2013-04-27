@@ -538,7 +538,7 @@ def new_allergies(links):
 	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
 	csvf.writerow(['URL', 'value'])
 	for link in links:
-		csvf.writerow([link, 'empty'])
+		csvf.writerow([link, None])
 
 
 def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
@@ -618,15 +618,16 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 		
 		start = time.time()
 		print('\n\n\nStarted downloading all of the data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
-		iterate_stats(teams, downloadedFiles)
-		iterate_schedules(teams, downloadedFiles)
-		iterate_broadcast(teams, downloadedFiles)
+		#iterate_stats(teams, downloadedFiles)
+		#iterate_schedules(teams, downloadedFiles)
+		#iterate_broadcast(teams, downloadedFiles)
 		try:
-			iterate_allergy(teams, downloadedFiles, True)
+			newcodes = iterate_allergy(teams, downloadedFiles, True)
 		except FileNotFoundError:
-			iterate_allergy(teams, downloadedFiles, False) 
+			newcodes = iterate_allergy(teams, downloadedFiles, False) 
+			new_allergies(newcodes)
 
-		iterate_overall(overall, downloadedFiles)
+		#iterate_overall(overall, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		
 		make_list()
