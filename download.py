@@ -109,7 +109,7 @@ def download_schedules(team, name):
 	datafile = os.path.join(directory,name+date+".csv")
 
 	if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
-		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['allergy']))
+		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['schedules']))
 		return {'html': True, 'datafile': datafile}
 
 	infile = open(datafile, "w", encoding='utf-8', newline = '')
@@ -127,13 +127,28 @@ def download_schedules(team, name):
 				headers = []
 				[headers.append(item) for item in header if item not in headers]
 				data = [entry.text.strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' not in entry.attrs]
-				sets = [entry.text.strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' in entry.attrs]
-				
+				tablenames = [entry.text.strip() for entry in table.find_all('td') if not entry.find_all('th') and 'colspan' in entry.attrs]
+				data = {data[i]: data[i:i+6] for i in range(0,len(data), 6)} #Create a dict for the 'table name'
 
-				for i, split in enumerate(sets):
-					csvf.writerow(['','',split]) #Get some extra padding at the front
-					csvf.writerow(headers)
-					csvf.writerow(data[i*6:i*6+6]) #There has to be a better way to zip this together. 
+				for line in table.text.split('\n'): #"Clever" hack to write tables as they appear in the data
+					if line == 'SplitWLRSRAWP':
+						csvf.writerow(headers)
+					elif line in tablenames:
+						csvf.writerow(['', '', line])
+					else:
+						test = [item for item in line.split(' ') if item]
+						empty = []
+						for item in test:
+							try:
+								int(item)
+							except ValueError:
+								try:
+									float(item)
+								except ValueError:
+									empty.append(item)
+						rowName = ' '.join(empty)
+						if rowName in data.keys():
+							csvf.writerow(data[' '.join(empty)])
 					
 			elif table.find('td').get_text() == 'Season Summary':
 			
@@ -155,7 +170,7 @@ def download_schedules(team, name):
 			print("Unable to process Table: {0} with attributes {1}".format(table.name, table.attrs))
 	
 	infile.close()
-	time.sleep(42)
+	time.sleep(5)
 	return {'html': schedules, 'datafile': datafile}
 
 
@@ -618,19 +633,21 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 		
 		start = time.time()
 		print('\n\n\nStarted downloading all of the data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
-		#iterate_stats(teams, downloadedFiles)
-		#iterate_schedules(teams, downloadedFiles)
-		#iterate_broadcast(teams, downloadedFiles)
+		iterate_stats(teams, downloadedFiles)
+		iterate_schedules(teams, downloadedFiles)
+		iterate_broadcast(teams, downloadedFiles)
 		try:
 			newcodes = iterate_allergy(teams, downloadedFiles, True)
 		except FileNotFoundError:
 			newcodes = iterate_allergy(teams, downloadedFiles, False) 
 			new_allergies(newcodes)
 
-		#iterate_overall(overall, downloadedFiles)
+		iterate_overall(overall, downloadedFiles)
 		minutes, seconds = divmod(time.time() - start, 60)
 		
 		make_list()
+		print('\n\n\nFinished downloading all of the data: {0} minutes and {1} seconds'.format(minutes, seconds))
+
 		sys.stdout.flush()
 		sys.stdout=sys.__stdout__
 		f.close()
@@ -643,7 +660,6 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
 		else:
 			print('No emails')
 
-		print('\n\n\nFinished downloading all of the data: {0} minutes and {1} seconds'.format(minutes, seconds))
 	elif command == 'send_email':
 		sys.stdout.flush()
 		sys.stdout=sys.__stdout__
