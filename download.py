@@ -170,7 +170,7 @@ def download_schedules(team, name):
 			print("Unable to process Table: {0} with attributes {1}".format(table.name, table.attrs))
 	
 	infile.close()
-	time.sleep(5)
+	time.sleep(42)
 	return {'html': schedules, 'datafile': datafile}
 
 
@@ -367,6 +367,68 @@ def download_wildcard(team, name='Wildcard'):
 
 	return {'html': wildcard, 'datafile': datafile}	
 
+def download_teambatting(team, name='Batting'):
+	if not team['batting']:
+		return
+	
+	date = time.strftime("_%m_%d_%Y")	
+	
+	directory = os.path.join('Data', date, 'Standings')
+	if not os.path.exists(directory):
+		os.makedirs(directory)
+
+	datafile = os.path.join(directory,name+date+".csv")
+
+	if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
+		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['batting']))
+		return {'html': True, 'datafile': datafile}
+
+	infile = open(datafile, "w", encoding='utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
+
+	batting = BeautifulSoup(urllib.request.urlopen(team['batting']))
+
+	for table in batting.find_all('table'):
+		
+		for row in table.find_all('tr'):
+			cols = [col.text for col in row.find_all('td')]			
+			csvf.writerow(cols)
+			
+	infile.close()
+
+	return {'html': batting, 'datafile': datafile}	
+
+def download_teampitching(team, name='Pitching'):
+	if not team['pitching']:
+		return
+	
+	date = time.strftime("_%m_%d_%Y")	
+	
+	directory = os.path.join('Data', date, 'Standings')
+	if not os.path.exists(directory):
+		os.makedirs(directory)
+
+	datafile = os.path.join(directory,name+date+".csv")
+
+	if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
+		print("Already got this one: Team - {0} \t URL - {1}".format(name, team['pitching']))
+		return {'html': True, 'datafile': datafile}
+
+	infile = open(datafile, "w", encoding='utf-8', newline = '')
+	csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
+
+	pitching = BeautifulSoup(urllib.request.urlopen(team['pitching']))
+
+	for table in pitching.find_all('table'):
+		
+		for row in table.find_all('tr'):
+			cols = [col.text for col in row.find_all('td')]			
+			csvf.writerow(cols)
+			
+	infile.close()
+
+	return {'html': pitching, 'datafile': datafile}	
+
 def get_promos(teams):
 
 	urls = deque([teams[team]['promo'] for team in teams.keys() if teams[team]['promo'] ])
@@ -507,6 +569,20 @@ def iterate_overall(overall, downloadedFiles):
 	data_stand = standings['datafile']
 	downloadedFiles['ALL']['Standings'] = {'File': os.path.abspath(data_stand), 'Size': os.path.getsize(data_stand)}
 
+	batting = download_teambatting(overall)
+	if batting['html'] is not True:
+		print('Downloading batting     for {0}: \t link: {1}'.format(overall, overall['batting']))
+	
+	data_batting = standings['datafile']
+	downloadedFiles['ALL']['Batting'] = {'File': os.path.abspath(data_batting), 'Size': os.path.getsize(data_batting)}
+
+	pitching = download_teampitching(overall)
+	if pitching['html'] is not True:
+		print('Downloading pitching     for {0}: \t link: {1}'.format(overall, overall['pitching']))
+	
+	data_pitching = standings['datafile']
+	downloadedFiles['ALL']['Pitching'] = {'File': os.path.abspath(data_pitching), 'Size': os.path.getsize(data_pitching)}
+	
 	return True
 
 def load_teams():
