@@ -15,7 +15,7 @@ SMTP_PORT = 587
 def zipdir(path, zipfile):
 	for root, dirs, files in os.walk(path):
 		for f in files:
-			if not f.endswith('.csv') and not f.endswith('.txt'):
+			if not (f.endswith('.csv') or f.endswith('.gif')) and not f.endswith('.txt'):
 				continue
 			zipfile.write(os.path.join(root, f) )
 
@@ -35,7 +35,7 @@ def send_email(date, directory, sendZip = True):
 
 	msg.attach( MIMEText(message) )
 
-	
+
 	if sendZip:
 		import zipfile
 		import tempfile
@@ -59,7 +59,7 @@ def send_email(date, directory, sendZip = True):
 		files = os.listdir(directory)
 		csvsearch = re.compile(".csv|.txt", re.IGNORECASE)
 		files = list(filter(csvsearch.search, files))
-		
+
 		for filename in files:
 
 			path =  os.path.abspath(os.path.join(directory, filename))

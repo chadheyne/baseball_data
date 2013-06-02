@@ -5,6 +5,7 @@ from PyQt4.QtGui import *
 from PyQt4.QtCore import *
 from PyQt4.QtWebKit import *
 from collections import defaultdict, deque
+from selenium import webdriver
 
 import urllib
 import urllib.request
@@ -14,41 +15,6 @@ import csv
 import os
 import datetime
 
-NUM_THREADS = 2
-
-
-class Render(QWebView):
-    active = deque()  # track how many threads are still active
-    data = {}  # store the data
-
-    def __init__(self, urls):
-        QWebView.__init__(self)
-        self.loadFinished.connect(self._loadFinished)
-        self.urls = urls
-        self.crawl()
-
-    def crawl(self):
-        try:
-            url = self.urls.pop()
-            Render.active.append(1)
-            self.load(QUrl(url))
-        except IndexError:
-            if not Render.active:
-                self.close()
-
-    def _loadFinished(self, result):
-        # process the downloaded html
-        frame = self.page().mainFrame()
-        url = str(frame.url().toString())
-        print(url)
-        Render.data[url] = frame.toHtml()
-        try:
-            Render.active.popleft()
-        except IndexError:
-            self.crawl()
-
-        self.crawl()  # crawl next URL in the list
-
 
 def download_stats(team, name):
 
@@ -56,7 +22,7 @@ def download_stats(team, name):
         return
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Stats')
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -101,7 +67,7 @@ def download_schedules(team, name):
         return
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Schedules')
 
     if not os.path.exists(directory):
@@ -177,7 +143,7 @@ def download_schedules(team, name):
 def download_broadcast(team, name):
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Broadcast')
 
     if not os.path.exists(directory):
@@ -220,7 +186,7 @@ def download_allergy(team, name, codes):
         return
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Allergy')
 
     if not os.path.exists(directory):
@@ -260,12 +226,12 @@ def download_allergy(team, name, codes):
     return {'html': allergy, 'datafile': datafile, 'url': urls}
 
 
-def download_promo(team, name):
+def download_promo(team, name, driver):
 
     if not team['promo']:
         return
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Promo')
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -279,7 +245,9 @@ def download_promo(team, name):
     infile = open(datafile, "w", encoding='utf-8', newline='')
     csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
 
-    promo = BeautifulSoup(team['html'], 'html.parser')
+    driver.get(team['promo'])
+
+    promo = BeautifulSoup(driver.page_source, 'html.parser')
     csvf.writerow(['Time', 'Date', 'Opponent', 'Promotion', 'Links'])
     for table in promo.find_all('table'):
 
@@ -311,7 +279,7 @@ def download_standings(team, name='Full_Standings'):
         return
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Standings')
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -343,7 +311,7 @@ def download_wildcard(team, name='Wildcard'):
         return
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Standings')
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -370,12 +338,51 @@ def download_wildcard(team, name='Wildcard'):
     return {'html': wildcard, 'datafile': datafile}
 
 
+def download_altwildcard(team, driver, name='Alt Wildcard'):
+    if not team['wildcard']:
+        return
+
+    date = time.strftime("_%m_%d_%Y")
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
+    directory = os.path.join(DATA_DIR, 'Standings')
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    datafile = os.path.join(directory, name+date+".csv")
+
+    if os.path.exists(datafile) and os.path.getsize(datafile) > 0:
+        print("Already got this one: Team - {0} \t URL - {1}".format(name, team['wildcard']))
+        return {'html': True, 'datafile': datafile}
+
+    infile = open(datafile, "w", encoding='utf-8', newline='')
+    csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
+
+    #driver = webdriver.PhantomJS('phantomjs')
+    driver.get(team['wildcard'])
+    wildcard = BeautifulSoup(driver.page_source, 'html.parser')
+
+    for table in wildcard.find_all('table'):
+        if 'data_grid' not in table.attrs['class']:
+            continue
+
+        for row in table.find_all('tr'):
+            if row.find_all('th'):
+                head = [h.text for h in row.find_all('th')]
+                csvf.writerow(head)
+            cols = [col.text for col in row.find_all('td')]
+            csvf.writerow(cols)
+
+    infile.close()
+
+    return {'html': wildcard, 'datafile': datafile}
+
+
 def download_teambatting(team, name='Batting'):
     if not team['batting']:
         return
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Standings')
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -407,7 +414,7 @@ def download_teampitching(team, name='Pitching'):
         return
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR, 'Standings')
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -434,31 +441,10 @@ def download_teampitching(team, name='Pitching'):
     return {'html': pitching, 'datafile': datafile}
 
 
-def get_promos(teams):
-
-    urls = deque([teams[team]['promo'] for team in teams.keys() if teams[team]['promo']])
-
-    app = QApplication(sys.argv)
-
-    renders = [Render(urls) for i in range(NUM_THREADS)]
-    app.exec_()
-
-    for team in teams:
-        try:
-            if not teams[team]['promo'] or not Render.data[teams[team]['promo']]:
-                continue
-        except KeyError:
-            print(team, teams[team]['promo'])
-            continue
-        teams[team]['html'] = Render.data[teams[team]['promo']]
-
-    return teams
-
-
 def get_allergycodes(date):
 
     allergy = defaultdict(dict)
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     allergydata = csv.DictReader(open(DATA_DIR+"/allergycodes"+date+".csv"))
     for row in allergydata:
         allergy[row['URL']] = row['value']
@@ -514,15 +500,12 @@ def iterate_broadcast(teams, downloadedFiles):
     return True
 
 
-def iterate_promo(teams, downloadedFiles, mainQt=False):
-
-    if mainQt is False:
-        teams = get_promos(teams)
+def iterate_promo(teams, downloadedFiles, driver):
 
     for team in sorted(teams.keys()):
         print(teams[team].keys())
 
-        results = download_promo(teams[team], team)
+        results = download_promo(teams[team], team, driver)
 
         if results['html'] is True:
             continue
@@ -558,7 +541,7 @@ def iterate_allergy(teams, downloadedFiles, havenewCodes=False):
     return urls
 
 
-def iterate_overall(overall, downloadedFiles):
+def iterate_overall(overall, downloadedFiles, driver):
 
     wildcard = download_wildcard(overall)
     if wildcard['html'] is not True:
@@ -566,6 +549,13 @@ def iterate_overall(overall, downloadedFiles):
 
     data_wild = wildcard['datafile']
     downloadedFiles['ALL']['Wildcard'] = {'File': os.path.abspath(data_wild), 'Size': os.path.getsize(data_wild)}
+
+    alt_wildcard = download_altwildcard(overall, driver)
+    if alt_wildcard['html'] is not True:
+        print('Downloading wildcard     for {0}: \t link: {1}'.format(overall, overall['wildcard']))
+
+    data_alt_wild = alt_wildcard['datafile']
+    downloadedFiles['ALL']['Alt Wildcard'] = {'File': os.path.abspath(data_alt_wild), 'Size': os.path.getsize(data_alt_wild)}
 
     standings = download_standings(overall)
     if standings['html'] is not True:
@@ -594,7 +584,7 @@ def iterate_overall(overall, downloadedFiles):
 def load_teams():
     teams = defaultdict(dict)
     downloadedFiles = defaultdict(dict)
-    team_file = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', 'MLB 2013 Req Daily Info - Websites.csv'))
+    team_file = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', 'MLB 2013 Req Daily Info - Websites.csv'))
     teamdata = csv.DictReader(open(team_file))
 
     for rows in teamdata:
@@ -612,7 +602,7 @@ def load_teams():
 def make_list():
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     infile = open(DATA_DIR+'/List'+date+'.csv', 'w', encoding='utf-8', newline='')
     csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
 
@@ -634,7 +624,7 @@ def make_list():
 def new_allergies(links):
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
 
     infile = open(DATA_DIR+'/allergycodes'+date+'.csv', 'a', encoding='utf-8', newline='')
     csvf = csv.writer(infile, quoting=csv.QUOTE_ALL)
@@ -652,8 +642,10 @@ def new_allergies(links):
 
 def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     f = open(DATA_DIR+'/Log.txt', 'a')
+
+    driver = webdriver.PhantomJS('phantomjs')
 
     sys.stdout = f
     if command == 'iterate_allergy':
@@ -693,7 +685,7 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
     elif command == 'iterate_promo':
         start = time.time()
         print('\n\n\nStarted downloading promo data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
-        iterate_promo(teams, downloadedFiles, True)
+        iterate_promo(teams, downloadedFiles, driver)
         minutes, seconds = divmod(time.time() - start, 60)
         print('\n\n\nFinished downloading promo data: {0} minutes and {1} seconds'.format(minutes, seconds))
         make_list()
@@ -715,7 +707,7 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
     elif command == 'iterate_overall':
         start = time.time()
         print('\n\n\nStarted downloading overall data: {0}'.format(datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
-        iterate_overall(overall, downloadedFiles)
+        iterate_overall(overall, downloadedFiles, driver)
         minutes, seconds = divmod(time.time() - start, 60)
         print('\n\n\nFinished downloading overall data: {0} minutes and {1} seconds'.format(minutes, seconds))
         make_list()
@@ -736,7 +728,8 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
             newcodes = iterate_allergy(teams, downloadedFiles, False)
             new_allergies(newcodes)
 
-        iterate_overall(overall, downloadedFiles)
+        iterate_promo(teams, downloadedFiles, driver)
+        iterate_overall(overall, downloadedFiles, driver)
         minutes, seconds = divmod(time.time() - start, 60)
 
         make_list()
@@ -766,31 +759,11 @@ def processGUI(command, teams, overall, downloadedFiles, subcommand=False):
             print('No emails')
 
 
-def ocr_images(urls, downloadedFiles):
-    import io
-
-    for url in urls:
-
-        pic = io.BytesIO(urllib.request.urlopen(url).read())
-
-        img = Image.open(pic)
-        tr = Tesseract()
-        text = tr.ocr_image(img)
-        print(text.split('\n')[0])
-
-
-def load_json(urls, downloadedFiles):
-    import json
-    import requests
-    jsonurl = requests.request('GET', urls)
-    jsondata = jsonurl.json()
-
-
 def send_update(wantZip=True):
     import email_data
 
     date = time.strftime("_%m_%d_%Y")
-    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+    DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
     directory = os.path.join(DATA_DIR)
     date.translate(str.maketrans('_', '/'))
     email_data.send_email(date, directory, wantZip)  # Add third argument sendZip = False in order to only send main results

@@ -25,7 +25,7 @@ import os
 import sys
 
 date = time.strftime("_%m_%d_%Y")
-directory = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Data', date))
+directory = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), 'Data', date))
 
 if not os.path.exists(directory):
     os.makedirs(directory)
@@ -89,8 +89,6 @@ class Window(QtGui.QWidget):
             layout.addWidget(downloadBtn)
             downloadBtn.clicked.connect(self.handleFalse)
 
-        #sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
-
     def handleTrue(self, command):
         import download
         self.normalOutputWritten('Started downloading {0}: {1}\n\n\n'.format(self.command, datetime.datetime.now().strftime('%A %B, %Y: %H:%M:%S %p')))
@@ -145,6 +143,10 @@ class Ui_MainWindow(object):
         pollenBtn.setObjectName(_fromUtf8("pollenBtn"))
         self.verticalLayout.addWidget(pollenBtn)
 
+        promoBtn = QtGui.QPushButton(self.verticalLayoutWidget)
+        promoBtn.setObjectName(_fromUtf8("promoBtn"))
+        self.verticalLayout.addWidget(promoBtn)
+
         overallBtn = QtGui.QPushButton(self.verticalLayoutWidget)
         overallBtn.setObjectName(_fromUtf8("overallBtn"))
         self.verticalLayout.addWidget(overallBtn)
@@ -177,6 +179,7 @@ class Ui_MainWindow(object):
         schedBtn.setText(_translate("MainWindow", "Download Schedule Data", None))
         broadBtn.setText(_translate("MainWindow", "Download Broadcast Data", None))
         pollenBtn.setText(_translate("MainWindow", "Download Pollen Data", None))
+        promoBtn.setText(_translate("MainWindow", "Download Promotion Data", None))
         allBtn.setText(_translate("MainWindow", "Download Everything", None))
         emailBtn.setText(_translate("MainWindow", "Send a new email", None))
         self.retranslateUi(MainWindow)
@@ -186,6 +189,7 @@ class Ui_MainWindow(object):
         schedBtn.clicked.connect(self.schedule)
         broadBtn.clicked.connect(self.broadcast)
         pollenBtn.clicked.connect(self.pollen)
+        promoBtn.clicked.connect(self.promo)
         allBtn.clicked.connect(self.downloadAll)
         emailBtn.clicked.connect(self.newEmail)
 
@@ -225,6 +229,13 @@ class Ui_MainWindow(object):
 
         self.w.show()
 
+    def promo(self):
+
+        print("Opening a new popup window...")
+        self.w = Window('Download Promotions', 'iterate_promo')
+
+        self.w.show()
+
     def overall(self):
         print("Opening a new popup window...")
         self.w = Window('Download Overall', 'iterate_overall')
@@ -250,25 +261,7 @@ if __name__ == "__main__":
     ui = Ui_MainWindow()
     ui.setupUi(MainWindow)
     MainWindow.show()
-    app.exec_()
 
-    teams2 = dict(teams)
-
-    for team in teams2.keys():
-        directory = os.path.join('Data', date, 'Promo', team+date+".csv")
-        if os.path.exists(directory):
-            del teams[team]
-            print("Already got it team {0}: url - {1}".format(team, teams2[team]['promo']))
-    if teams:
-        app.quit()
-        from promo_interface import Downloader
-        downloader = Downloader(sorted(list(teams.keys())), teams, f)
-        downloader.done.connect(app.quit)
-        web = QWebView()
-        web.setPage(downloader.page)
-        web.show()
-    else:
-        sys.exit()
     sys.stdout.flush()
     sys.stdout = sys.__stdout__
     f.close()
